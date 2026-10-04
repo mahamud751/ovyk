@@ -1,0 +1,803 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  DRIVER
+  ADMIN
+  DISPATCHER
+  SUPPORT
+  EMERGENCY_RESPONDER
+  FLEET_MANAGER
+  FINANCE
+  PARTNER_MANAGER
+  PARTNER
+  NOMINEE
+}
+
+enum Language {
+  EN
+  BN
+}
+
+enum VehicleCategory {
+  EXECUTIVE
+  FAMILY
+  PREMIUM
+}
+
+enum GuaranteeType {
+  SPECIFIC
+  CATEGORY
+}
+
+enum BookingType {
+  DAY
+  STAY
+}
+
+enum BookingPeriod {
+  DAILY
+  WEEKLY
+  FOURTEEN
+  TWENTY_ONE
+  MONTHLY
+  CUSTOM
+}
+
+enum BookingStatus {
+  DRAFT
+  RESERVED
+  PENDING_APPROVAL
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  DEPOSIT_PAID
+  PARTIAL
+  PAID
+  REFUND_PENDING
+  REFUNDED
+  FAILED
+}
+
+enum HoldStatus {
+  ACTIVE
+  RELEASED
+  CONVERTED
+  EXPIRED
+}
+
+enum AllocationStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CARD
+  BKASH
+  NAGAD
+}
+
+enum PaymentKind {
+  DEPOSIT
+  BALANCE
+  FULL
+  TIP
+}
+
+enum PayState {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum JourneyStatus {
+  PLANNED
+  ARRIVED
+  COLLECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum LocationSource {
+  DRIVER_APP
+  VEHICLE_TRACKER
+}
+
+enum ShareScope {
+  JOURNEY
+  BOOKING
+}
+
+enum ShareStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum MessageChannel {
+  CONCIERGE
+  DRIVER
+  OPS
+}
+
+enum EmergencyType {
+  UNSPECIFIED
+  ACCIDENT
+  MEDICAL
+  HIJACKING
+  THREAT
+  OTHER
+}
+
+enum EmergencyStatus {
+  SENDING
+  DELIVERED
+  ACKNOWLEDGED
+  ASSISTANCE_DISPATCHED
+  ESCALATED
+  CANCEL_REQUESTED
+  RESOLVED
+  FAILED
+}
+
+enum DriverStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+enum PartnerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+enum DocStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AmendmentStatus {
+  QUOTED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum NotificationChannel {
+  PUSH
+  EMAIL
+  SMS
+  WHATSAPP
+  IN_APP
+}
+
+enum ScheduleKind {
+  WORK
+  REST
+}
+
+enum BlockReason {
+  MAINTENANCE
+  DOCUMENT
+}
+
+model User {
+  id                String    @id @default(cuid())
+  role              Role      @default(CUSTOMER)
+  phone             String?   @unique
+  email             String?   @unique
+  passwordHash      String?
+  name              String
+  photoUrl          String?
+  preferredLanguage Language  @default(EN)
+  marketingConsent  Boolean   @default(false)
+  notifyPush        Boolean   @default(true)
+  notifyEmail       Boolean   @default(true)
+  notifySms         Boolean   @default(true)
+  notifyWhatsapp    Boolean   @default(false)
+  safeContactMethod String    @default("phone")
+  emergencyName     String?
+  emergencyPhone    String?
+  mfaEnabled        Boolean   @default(false)
+  partnerId         String?
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  partner            Partner?       @relation(fields: [partnerId], references: [id])
+  addresses          Address[]
+  passengers         Passenger[]
+  customerBookings   Booking[]      @relation("CustomerBookings")
+  organisedBookings  Booking[]      @relation("OrganiserBookings")
+  payerBookings      Booking[]      @relation("PayerBookings")
+  driver             Driver?
+  messages           Message[]
+  notifications      Notification[]
+  reviews            Review[]
+  emergencies        Emergency[]
+  auditLogs          AuditLog[]
+  nomineeShares      NomineeShare[]
+}
+
+model OtpChallenge {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String
+  purpose    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, purpose, createdAt])
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String
+  line      String
+  kind      String
+  cityId    String?
+  lat       Float?
+  lng       Float?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Passenger {
+  id           String    @id @default(cuid())
+  organiserId  String
+  name         String
+  phone        String?
+  relationship String    @default("self")
+  notes        String?
+  createdAt    DateTime  @default(now())
+  organiser    User      @relation(fields: [organiserId], references: [id])
+  bookings     Booking[]
+}
+
+model City {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String
+  country   String    @default("Bangladesh")
+  active    Boolean   @default(true)
+  lat       Float
+  lng       Float
+  places    Place[]
+  vehicles  Vehicle[]
+  drivers   Driver[]
+  bookings  Booking[]
+}
+
+model Place {
+  id     String @id @default(cuid())
+  cityId String
+  kind   String
+  name   String
+  line   String
+  lat    Float
+  lng    Float
+  city   City   @relation(fields: [cityId], references: [id])
+}
+
+model Partner {
+  id                  String        @id @default(cuid())
+  name                String
+  status              PartnerStatus @default(PENDING)
+  commissionPercent   Int           @default(80)
+  settlementNotes     String?
+  createdAt           DateTime      @default(now())
+  users               User[]
+  vehicles            Vehicle[]
+  drivers             Driver[]
+  settlements         Settlement[]
+}
+
+model Vehicle {
+  id               String          @id @default(cuid())
+  partnerId        String
+  cityId           String
+  slug             String          @unique
+  category         VehicleCategory
+  name             String
+  subtitle         String
+  description      String
+  descriptionBn    String
+  make             String
+  model            String
+  modelYear        Int
+  seats            Int
+  luggage          Int
+  airConditioning  Boolean         @default(true)
+  features         String[]
+  photos           String[]
+  dailyRate        Int
+  verified         Boolean         @default(false)
+  approved         Boolean         @default(false)
+  active           Boolean         @default(true)
+  guaranteeType    GuaranteeType   @default(CATEGORY)
+  childSeat        Boolean         @default(true)
+  registrationNo   String?
+  createdAt        DateTime        @default(now())
+  partner          Partner         @relation(fields: [partnerId], references: [id])
+  city             City            @relation(fields: [cityId], references: [id])
+  blocks           VehicleBlock[]
+  bookings         Booking[]
+  holds            CheckoutHold[]
+  allocations      Allocation[]
+}
+
+model VehicleBlock {
+  id        String      @id @default(cuid())
+  vehicleId String
+  startAt   DateTime
+  endAt     DateTime
+  reason    BlockReason
+  note      String?
+  vehicle   Vehicle     @relation(fields: [vehicleId], references: [id])
+}
+
+model Driver {
+  id               String       @id @default(cuid())
+  userId           String       @unique
+  partnerId        String
+  cityId           String
+  languages        String[]
+  experienceYears  Int
+  rating           Float        @default(5)
+  reviewCount      Int          @default(0)
+  licenceNumber    String
+  licenceExpiry    DateTime
+  status           DriverStatus @default(PENDING)
+  photoUrl         String?
+  bio              String
+  uniformCheckedAt DateTime?
+  trainingNote     String?
+  createdAt        DateTime     @default(now())
+  user             User         @relation(fields: [userId], references: [id])
+  partner          Partner      @relation(fields: [partnerId], references: [id])
+  city             City         @relation(fields: [cityId], references: [id])
+  schedules        DriverSchedule[]
+  bookings         Booking[]
+  holds            CheckoutHold[]
+  allocations      Allocation[]
+  tips             Tip[]
+  reviews          Review[]
+}
+
+model DriverSchedule {
+  id       String       @id @default(cuid())
+  driverId String
+  startAt  DateTime
+  endAt    DateTime
+  kind     ScheduleKind
+  note     String?
+  driver   Driver       @relation(fields: [driverId], references: [id])
+}
+
+model Document {
+  id        String    @id @default(cuid())
+  ownerType String
+  ownerId   String
+  kind      String
+  fileName  String
+  status    DocStatus @default(PENDING)
+  expiresOn DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([ownerType, ownerId])
+}
+
+model PromoCode {
+  code       String    @id
+  percentOff Int       @default(0)
+  amountOff  Int       @default(0)
+  active     Boolean   @default(true)
+  expiresAt  DateTime?
+}
+
+model ExchangeRate {
+  id    String   @id @default(cuid())
+  quote String
+  rate  Float
+  asOf  DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value Json
+}
+
+model Booking {
+  id                  String         @id @default(cuid())
+  reference           String         @unique
+  customerId          String
+  organiserId         String
+  payerId             String
+  passengerId         String?
+  cityId              String
+  vehicleId           String?
+  driverId            String?
+  preferredDriverId   String?
+  type                BookingType
+  period              BookingPeriod  @default(CUSTOM)
+  status              BookingStatus  @default(DRAFT)
+  paymentStatus       PaymentStatus  @default(UNPAID)
+  startDate           String
+  endDate             String
+  pickupTime          String
+  startAt             DateTime
+  endAt               DateTime
+  pickupLabel         String
+  pickupLat           Float?
+  pickupLng           Float?
+  pickupKind          String         @default("AIRPORT")
+  passengers          Int
+  luggage             Int
+  flightNumber        String?
+  childSeat           Boolean        @default(false)
+  accessibility       Boolean        @default(false)
+  notes               String?
+  priceSnapshot       Json?
+  policyVersion       String?
+  totalBdt            Int            @default(0)
+  depositBdt          Int            @default(0)
+  balanceBdt          Int            @default(0)
+  discountBdt         Int            @default(0)
+  promoCode           String?
+  termsAccepted       Boolean        @default(false)
+  termsAcceptedAt     DateTime?
+  cancelReason        String?
+  currency            String         @default("BDT")
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  customer   User       @relation("CustomerBookings", fields: [customerId], references: [id])
+  organiser  User       @relation("OrganiserBookings", fields: [organiserId], references: [id])
+  payer      User       @relation("PayerBookings", fields: [payerId], references: [id])
+  passenger  Passenger? @relation(fields: [passengerId], references: [id])
+  city       City       @relation(fields: [cityId], references: [id])
+  vehicle    Vehicle?   @relation(fields: [vehicleId], references: [id])
+  driver     Driver?    @relation(fields: [driverId], references: [id])
+  holds      CheckoutHold[]
+  allocations Allocation[]
+  journeys   Journey[]
+  payments   Payment[]
+  refunds    Refund[]
+  tips       Tip[]
+  invoices   Invoice[]
+  expenses   Expense[]
+  amendments Amendment[]
+  pings      LocationPing[]
+  shares     NomineeShare[]
+  messages   Message[]
+  emergencies Emergency[]
+  reviews    Review[]
+  inspections Inspection[]
+  issues     IssueReport[]
+  settlement Settlement?
+}
+
+model CheckoutHold {
+  id        String     @id @default(cuid())
+  bookingId String
+  vehicleId String
+  driverId  String
+  startAt   DateTime
+  endAt     DateTime
+  expiresAt DateTime
+  status    HoldStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  booking   Booking    @relation(fields: [bookingId], references: [id])
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id])
+  driver    Driver     @relation(fields: [driverId], references: [id])
+
+  @@index([vehicleId, status])
+  @@index([driverId, status])
+}
+
+model Allocation {
+  id        String           @id @default(cuid())
+  bookingId String
+  vehicleId String
+  driverId  String
+  startAt   DateTime
+  endAt     DateTime
+  kind      String           @default("PRIMARY")
+  status    AllocationStatus @default(ACTIVE)
+  note      String?
+  createdAt DateTime         @default(now())
+  booking   Booking          @relation(fields: [bookingId], references: [id])
+  vehicle   Vehicle          @relation(fields: [vehicleId], references: [id])
+  driver    Driver           @relation(fields: [driverId], references: [id])
+
+  @@index([vehicleId, status])
+  @@index([driverId, status])
+}
+
+model Journey {
+  id         String        @id @default(cuid())
+  bookingId  String
+  date       String
+  status     JourneyStatus @default(PLANNED)
+  stops      Json?
+  hoursUsed  Float         @default(0)
+  kmUsed     Float         @default(0)
+  destination String?
+  createdAt  DateTime      @default(now())
+  booking    Booking       @relation(fields: [bookingId], references: [id])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  bookingId       String?
+  userId          String
+  kind            PaymentKind
+  method          PaymentMethod
+  status          PayState
+  amountBdt       Int
+  idempotencyKey  String        @unique
+  providerRef     String?
+  displayLabel    String?
+  failureReason   String?
+  createdAt       DateTime      @default(now())
+  booking         Booking?      @relation(fields: [bookingId], references: [id])
+  refunds         Refund[]
+  tip             Tip?
+}
+
+model Refund {
+  id         String       @id @default(cuid())
+  bookingId  String
+  paymentId  String
+  amountBdt  Int
+  status     RefundStatus @default(PENDING)
+  reason     String
+  approvedBy String?
+  createdAt  DateTime     @default(now())
+  booking    Booking      @relation(fields: [bookingId], references: [id])
+  payment    Payment      @relation(fields: [paymentId], references: [id])
+}
+
+model Tip {
+  id        String    @id @default(cuid())
+  bookingId String
+  driverId  String
+  paymentId String?   @unique
+  amountBdt Int
+  status    PayState  @default(PENDING)
+  createdAt DateTime  @default(now())
+  booking   Booking   @relation(fields: [bookingId], references: [id])
+  driver    Driver    @relation(fields: [driverId], references: [id])
+  payment   Payment?  @relation(fields: [paymentId], references: [id])
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  bookingId String
+  number    String   @unique
+  amountBdt Int
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+}
+
+model Expense {
+  id           String        @id @default(cuid())
+  bookingId    String
+  driverId     String
+  kind         String
+  amountBdt    Int
+  note         String?
+  evidenceNote String?
+  status       ExpenseStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+  booking      Booking       @relation(fields: [bookingId], references: [id])
+}
+
+model Amendment {
+  id           String           @id @default(cuid())
+  bookingId    String
+  kind         String
+  payload      Json
+  priceDiffBdt Int              @default(0)
+  status       AmendmentStatus  @default(QUOTED)
+  createdAt    DateTime         @default(now())
+  booking      Booking          @relation(fields: [bookingId], references: [id])
+}
+
+model LocationPing {
+  id         String         @id @default(cuid())
+  bookingId  String
+  driverId   String?
+  vehicleId  String?
+  lat        Float
+  lng        Float
+  heading    Float?
+  source     LocationSource
+  recordedAt DateTime       @default(now())
+  booking    Booking        @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId, recordedAt])
+}
+
+model NomineeShare {
+  id              String      @id @default(cuid())
+  bookingId       String
+  createdById     String
+  name            String
+  phone           String?
+  token           String      @unique
+  scope           ShareScope
+  status          ShareStatus @default(ACTIVE)
+  startsAt        DateTime
+  endsAt          DateTime
+  notifyPickup    Boolean     @default(true)
+  notifyArrival   Boolean     @default(true)
+  notifyComplete  Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  booking         Booking     @relation(fields: [bookingId], references: [id])
+  createdBy       User        @relation(fields: [createdById], references: [id])
+  logs            ShareLog[]
+}
+
+model ShareLog {
+  id        String       @id @default(cuid())
+  shareId   String
+  action    String
+  createdAt DateTime     @default(now())
+  share     NomineeShare @relation(fields: [shareId], references: [id])
+}
+
+model Message {
+  id        String         @id @default(cuid())
+  bookingId String?
+  senderId  String
+  channel   MessageChannel
+  body      String
+  createdAt DateTime       @default(now())
+  booking   Booking?       @relation(fields: [bookingId], references: [id])
+  sender    User           @relation(fields: [senderId], references: [id])
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  channel   NotificationChannel @default(IN_APP)
+  title     String
+  body      String
+  bookingId String?
+  readAt    DateTime?
+  failed    Boolean             @default(false)
+  createdAt DateTime            @default(now())
+  user      User                @relation(fields: [userId], references: [id])
+}
+
+model Emergency {
+  id             String          @id @default(cuid())
+  bookingId      String?
+  userId         String
+  type           EmergencyType   @default(UNSPECIFIED)
+  silent         Boolean         @default(false)
+  status         EmergencyStatus @default(DELIVERED)
+  lat            Float?
+  lng            Float?
+  locationSource String?
+  locationAt     DateTime?
+  destination    String?
+  safeContact    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  booking        Booking?        @relation(fields: [bookingId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  events         EmergencyEvent[]
+}
+
+model EmergencyEvent {
+  id          String    @id @default(cuid())
+  emergencyId String
+  actorId     String?
+  kind        String
+  note        String?
+  createdAt   DateTime  @default(now())
+  emergency   Emergency @relation(fields: [emergencyId], references: [id])
+}
+
+model Review {
+  id                String   @id @default(cuid())
+  bookingId         String
+  userId            String
+  driverId          String?
+  overall           Int
+  comfort           Int?
+  cleanliness       Int?
+  punctuality       Int?
+  professionalism   Int?
+  comment           String?
+  complaint         Boolean  @default(false)
+  hidden            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  booking           Booking  @relation(fields: [bookingId], references: [id])
+  user              User     @relation(fields: [userId], references: [id])
+  driver            Driver?  @relation(fields: [driverId], references: [id])
+
+  @@unique([bookingId, userId])
+}
+
+model Inspection {
+  id          String   @id @default(cuid())
+  bookingId   String
+  driverId    String
+  cleanliness Boolean
+  exteriorOk  Boolean
+  interiorOk  Boolean
+  notes       String?
+  createdAt   DateTime @default(now())
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+}
+
+model IssueReport {
+  id        String   @id @default(cuid())
+  bookingId String
+  driverId  String
+  kind      String
+  note      String
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+}
+
+model Settlement {
+  id              String   @id @default(cuid())
+  bookingId       String   @unique
+  partnerId       String?
+  grossBdt        Int
+  partnerShareBdt Int
+  ovykShareBdt    Int
+  tipBdt          Int      @default(0)
+  status          String   @default("OPEN")
+  createdAt       DateTime @default(now())
+  booking         Booking  @relation(fields: [bookingId], references: [id])
+  partner         Partner? @relation(fields: [partnerId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation(fields: [actorId], references: [id])
+}

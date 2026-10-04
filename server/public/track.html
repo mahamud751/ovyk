@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OVYK family tracking</title>
+  <style>
+    body { margin: 0; font-family: "Avenir Next", "Segoe UI", sans-serif; background: #0c0c0c; color: #f4efe6; }
+    main { max-width: 480px; margin: 0 auto; padding: 28px 20px 48px; }
+    h1 { font-family: Georgia, serif; letter-spacing: 0.2em; font-weight: 500; }
+    .gold { color: #c6a36a; letter-spacing: 0.04em; }
+    .card { background: #f4efe6; color: #1a1a1a; border-radius: 18px; padding: 16px; margin: 12px 0; }
+    button { width: 100%; margin-top: 8px; background: #c6a36a; border: 0; border-radius: 999px; padding: 12px; }
+    input { width: 100%; padding: 12px; border-radius: 12px; border: 0; }
+    a { color: #c6a36a; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>OVYK</h1>
+    <p class="gold">The new word for Comfort</p>
+    <p>Private vehicle tracking for a nominated contact.</p>
+    <input id="token" placeholder="Tracking code" />
+    <button id="open">Open tracking</button>
+    <div id="out"></div>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const tokenInput = document.getElementById('token');
+    tokenInput.value = params.get('token') || '';
+    async function load(token) {
+      const res = await fetch('/api/share/' + encodeURIComponent(token));
+      const data = await res.json();
+      const box = document.getElementById('out');
+      if (!res.ok) { box.innerHTML = '<div class="card">' + (data.message || 'This link has ended') + '</div>'; return; }
+      const point = data.track.current || data.track.lastKnown;
+      const map = point ? `https://staticmap.openstreetmap.de/staticmap.php?center=${point.lat},${point.lng}&zoom=13&size=600x320&markers=${point.lat},${point.lng},red` : '';
+      box.innerHTML = `<div class="card">
+        <strong>${data.city}</strong>
+        <p>${data.vehicle || 'Vehicle'} · ${data.reference}</p>
+        <p>Destination: ${data.destination}</p>
+        <p>${data.track.message}</p>
+        ${point ? `<p>Updated ${new Date(point.recordedAt).toLocaleString()} · ${point.source}</p>` : ''}
+        ${map ? `<img alt="Map" src="${map}" style="width:100%;border-radius:12px" />` : ''}
+        <button id="check">Ask OVYK to check</button>
+        <button id="concern">Report an urgent concern</button>
+      </div>`;
+      document.getElementById('check').onclick = () => act(token, 'check');
+      document.getElementById('concern').onclick = () => act(token, 'concern');
+    }
+    async function act(token, action) {
+      await fetch('/api/share/' + encodeURIComponent(token) + '/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      alert('Sent to the OVYK response team.');
+    }
+    document.getElementById('open').onclick = () => load(tokenInput.value.trim());
+    if (tokenInput.value) load(tokenInput.value);
+  </script>
+</body>
+</html>

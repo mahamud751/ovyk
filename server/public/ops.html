@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OVYK operations</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font-family: Georgia, "Times New Roman", serif; background: #f4efe6; color: #1a1a1a; }
+    header { background: #0c0c0c; color: #f4efe6; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-weight: 500; letter-spacing: 0.18em; font-size: 22px; margin: 0; }
+    h1 span { display: block; letter-spacing: 0.08em; font-size: 12px; color: #c6a36a; margin-top: 4px; font-family: "Avenir Next", sans-serif; }
+    main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+    section { background: #fffdf8; border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+    button, input { font-family: "Avenir Next", "Segoe UI", sans-serif; }
+    button { background: #c6a36a; border: 0; border-radius: 999px; padding: 10px 16px; cursor: pointer; }
+    button.ghost { background: transparent; border: 1px solid #1a1a1a; }
+    button.danger { background: transparent; color: #c44747; border: 1px solid #c44747; }
+    input { border: 1px solid #e6dfd3; border-radius: 10px; padding: 10px; width: 100%; margin: 6px 0 12px; }
+    table { width: 100%; border-collapse: collapse; font-family: "Avenir Next", sans-serif; font-size: 14px; }
+    td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .muted { color: #5e584f; font-family: "Avenir Next", sans-serif; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OVYK<span>The new word for Comfort</span></h1>
+    <div id="who" class="muted"></div>
+  </header>
+  <main>
+    <section id="login">
+      <h2>Staff sign in</h2>
+      <p class="muted">Admin admin@ovyk.com / admin123. The local second code is 123456.</p>
+      <label>Email<input id="email" value="admin@ovyk.com" /></label>
+      <label>Password<input id="password" type="password" value="admin123" /></label>
+      <button id="signin">Sign in</button>
+      <div id="mfa" hidden>
+        <label>Second code<input id="code" value="123456" /></label>
+        <button id="confirm">Confirm</button>
+      </div>
+      <p id="error" class="muted"></p>
+    </section>
+    <section id="desk" hidden>
+      <h2>Emergency queue</h2>
+      <div id="emergencies"></div>
+      <h2>Bookings</h2>
+      <div id="bookings"></div>
+      <p><button id="out" class="ghost">Sign out</button></p>
+    </section>
+  </main>
+  <script>
+    let token = localStorage.getItem('ovyk_ops') || '';
+    let mfaToken = '';
+    const $ = (id) => document.getElementById(id);
+    async function api(path, options = {}) {
+      const res = await fetch('/api' + path, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(options.headers || {}) },
+      });
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!res.ok) throw new Error(data?.message || res.statusText);
+      return data;
+    }
+    async function load() {
+      const [emergencies, bookings] = await Promise.all([api('/ops/emergencies'), api('/ops/bookings')]);
+      $('emergencies').innerHTML = emergencies.length ? '<table><tr><th>When</th><th>Passenger</th><th>Status</th><th></th></tr>' + emergencies.map((item) =>
+        `<tr><td>${new Date(item.createdAt).toLocaleString()}</td><td>${item.passenger.name}<br>${item.booking?.reference || ''}</td><td>${item.statusLabel}</td><td class="row">
+          <button onclick="act('${item.id}','acknowledge')">Acknowledge</button>
+          <button onclick="act('${item.id}','dispatch')">Help dispatched</button>
+          <button class="ghost" onclick="act('${item.id}','resolve')">Resolve</button>
+          <button class="danger" onclick="act('${item.id}','confirm-cancel')">Review cancel</button>
+        </td></tr>`).join('') + '</table>' : '<p class="muted">No open alerts.</p>';
+      $('bookings').innerHTML = '<table><tr><th>Reference</th><th>Customer</th><th>Status</th><th>Pay</th><th>Stay</th></tr>' + bookings.map((item) =>
+        `<tr><td>${item.reference}</td><td>${item.customer?.name || ''}</td><td>${item.status}</td><td>${item.paymentStatus}</td><td>${item.startDate} – ${item.endDate}<br>${item.vehicle?.name || ''}</td></tr>`).join('') + '</table>';
+    }
+    window.act = async (id, action) => {
+      await api('/ops/emergencies/' + id + '/' + action, { method: 'POST', body: JSON.stringify({ note: action }) });
+      await load();
+    };
+    $('signin').onclick = async () => {
+      $('error').textContent = '';
+      try {
+        const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: $('email').value, password: $('password').value }) });
+        if (data.mfaRequired) { mfaToken = data.mfaToken; $('mfa').hidden = false; return; }
+        token = data.accessToken; localStorage.setItem('ovyk_ops', token); showDesk(data.user.name);
+      } catch (error) { $('error').textContent = error.message; }
+    };
+    $('confirm').onclick = async () => {
+      try {
+        const data = await api('/auth/mfa', { method: 'POST', body: JSON.stringify({ mfaToken, code: $('code').value }) });
+        token = data.accessToken; localStorage.setItem('ovyk_ops', token); showDesk(data.user.name);
+      } catch (error) { $('error').textContent = error.message; }
+    };
+    $('out').onclick = () => { localStorage.removeItem('ovyk_ops'); location.reload(); };
+    function showDesk(name) {
+      $('login').hidden = true; $('desk').hidden = false; $('who').textContent = name;
+      load().catch((error) => { $('error').textContent = error.message; });
+    }
+    if (token) showDesk('Signed in');
+  </script>
+</body>
+</html>
