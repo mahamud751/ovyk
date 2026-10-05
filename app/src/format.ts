@@ -32,3 +32,16 @@ export function greetingWord(language: 'EN' | 'BN', date = new Date()) {
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+export function isoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+export function todayIso() {
+  return isoDate(new Date());
+}
+
+export function addDays(iso: string, days: number) {
+  const [year, month, day] = iso.split('-').map(Number);
+  return isoDate(new Date(year, month - 1, day + days));
+}

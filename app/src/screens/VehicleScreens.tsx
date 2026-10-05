@@ -5,7 +5,7 @@ import { BlackButton, FieldRow, GoldButton, Header, Icon, Screen, useT } from '.
 import { bdt, daysBetween } from '../format';
 import { photoSource } from '../images';
 import { useApp } from '../state';
-import { colors, sans, serif } from '../theme';
+import { colors, fonts, sans, serif } from '../theme';
 
 export type VehicleQuote = {
   id: string;
@@ -41,6 +41,11 @@ export type VehicleQuote = {
 };
 
 type Quote = { vehicles: VehicleQuote[]; days: number };
+
+function vehicleTitle(vehicle: { category?: string; make?: string; model?: string }) {
+  const category = vehicle.category === 'FAMILY' ? 'Family' : vehicle.category === 'EXECUTIVE' ? 'Executive' : 'Premium';
+  return `${category} / ${vehicle.make} ${vehicle.model}`;
+}
 
 function useQuote() {
   const { draft } = useApp();
@@ -84,9 +89,9 @@ export function VehiclesScreen({ navigation }: { navigation: { goBack: () => voi
     <Screen>
       <Header title={t('choose')} onBack={() => navigation.goBack()} />
       <View style={{ flex: 1, backgroundColor: colors.ivory }}>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 16 }}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 }}>
           <Text style={styles.hint}>
-            {draft.cityName === 'Sylhet' ? t('chooseHint') : `Select the perfect vehicle for your stay in ${draft.cityName}.`}
+            {t('chooseHint').replace('{city}', draft.cityName)}
           </Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {quote?.vehicles.map((vehicle) => {
@@ -94,20 +99,23 @@ export function VehiclesScreen({ navigation }: { navigation: { goBack: () => voi
             return (
               <Pressable key={vehicle.id} style={[styles.card, on && styles.cardOn]} onPress={() => setSelected(vehicle.id)}>
                 <Image source={photoSource(vehicle.photos[0])} style={styles.cardImage} />
-                <View style={styles.mark}>{on ? <Icon name="check" /> : <View style={styles.ring} />}</View>
+                <View style={styles.mark}>
+                  <Icon name={on ? 'check' : 'ring'} size={28} />
+                </View>
                 <View style={styles.cardBody}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{vehicle.name}</Text>
                     <Text style={styles.cardSub}>{vehicle.subtitle}</Text>
                     <View style={styles.capRow}>
-                      <Icon name="people" size={16} color={colors.secondary} />
+                      <Icon name="person" size={20} color={colors.ink} />
                       <Text style={styles.cap}>{vehicle.seats}</Text>
-                      <Icon name="bag" size={16} color={colors.secondary} />
+                      <View style={styles.capDivider} />
+                      <Icon name="bag" size={20} color={colors.ink} />
                       <Text style={styles.cap}>{vehicle.luggage}</Text>
                     </View>
                     {!vehicle.fits ? <Text style={styles.warn}>Fewer seats or bags than this request</Text> : null}
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
+                  <View style={styles.priceCol}>
                     <Text style={styles.price}>{bdt(vehicle.totalBdt)}</Text>
                     <Text style={styles.forDays}>for {days} days</Text>
                   </View>
@@ -183,7 +191,6 @@ export function VehicleDetailScreen({
     }
   }
 
-  const category = vehicle?.category === 'FAMILY' ? 'Family' : vehicle?.category === 'EXECUTIVE' ? 'Executive' : 'Premium';
 
   return (
     <Screen>
@@ -192,33 +199,38 @@ export function VehicleDetailScreen({
         {vehicle ? (
           <>
             <Image source={photoSource(vehicle.photos[0])} style={styles.hero} />
-            <View style={{ padding: 16 }}>
-              <Text style={styles.detailTitle}>{category} / {vehicle.make} {vehicle.model}</Text>
+            <View style={{ paddingHorizontal: 20, paddingTop: 14 }}>
+              <Text style={styles.detailTitle}>{vehicleTitle(vehicle)}</Text>
               <Text style={styles.copy}>{language === 'BN' ? vehicle.descriptionBn : vehicle.description}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 12 }}>
-                {vehicle.photos.slice(1).map((photo) => (
-                  <Image key={photo} source={photoSource(photo)} style={styles.thumb} />
+              <View style={styles.thumbs}>
+                {vehicle.photos.slice(1, 3).map((photo, index) => (
+                  <Image key={photo} source={photoSource(photo)} style={[styles.thumb, { flex: index === 0 ? 2.4 : 1 }]} />
                 ))}
-              </ScrollView>
-              <View style={styles.specs}>
-                <Spec icon="people" label={`${vehicle.seats} seats`} />
-                <Spec icon="bag" label={`${vehicle.luggage} luggage`} />
-                <Spec icon="clock" label={vehicle.airConditioning ? 'Air conditioning' : 'Fan'} />
               </View>
-              {vehicle.verified ? <Text style={styles.verified}>Verification complete for this category</Text> : null}
+              <View style={styles.specs}>
+                <Spec icon="person" label={`${vehicle.seats} seats`} />
+                <View style={styles.specDivider} />
+                <Spec icon="bag" label={`${vehicle.luggage} luggage`} />
+                <View style={styles.specDivider} />
+                <Spec icon="snow" label={vehicle.airConditioning ? 'Air conditioning' : 'Fan'} />
+              </View>
               <Pressable style={styles.line}>
-                <View>
-                  <Text style={styles.lineTitle}>{bdt(vehicle.totalBdt)} / {vehicle.days} days</Text>
+                <Icon name="seat" size={26} color={colors.ink} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.lineTitle}>
+                    <Text style={{ fontFamily: fonts.sansBold }}>{bdt(vehicle.totalBdt)}</Text> / {vehicle.days} days
+                  </Text>
                   <Text style={styles.lineSub}>{t('includesDriver')}</Text>
                 </View>
-                <Text style={styles.chev}>›</Text>
+                <Icon name="chevron" size={18} color={colors.ink} />
               </Pressable>
               <Pressable style={styles.line} onPress={() => setTerms((value) => !value)}>
+                <Icon name="doc" size={26} color={colors.ink} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.lineTitle}>{t('packageTerms')}</Text>
+                  <Text style={[styles.lineTitle, { fontSize: 15 }]}>{t('packageTerms')}</Text>
                   <Text style={styles.lineSub}>{t('seeTerms')}</Text>
                 </View>
-                <Text style={styles.chev}>›</Text>
+                <Icon name={terms ? 'chevronDown' : 'chevron'} size={18} color={colors.ink} />
               </Pressable>
               {terms ? (
                 <View style={styles.terms}>
@@ -232,7 +244,8 @@ export function VehicleDetailScreen({
                 </View>
               ) : null}
               {error || localError ? <Text style={styles.error}>{localError || error}</Text> : null}
-              <GoldButton label={t('continue')} onPress={continueToReview} loading={loading} />
+              <View style={{ height: 10 }} />
+              <GoldButton label={t('continue')} onPress={continueToReview} loading={loading} height={54} />
             </View>
           </>
         ) : (
@@ -246,7 +259,7 @@ export function VehicleDetailScreen({
 function Spec({ icon, label }: { icon: string; label: string }) {
   return (
     <View style={styles.spec}>
-      <Icon name={icon} size={18} color={colors.secondary} />
+      <Icon name={icon} size={22} color={colors.ink} />
       <Text style={styles.specText}>{label}</Text>
     </View>
   );
@@ -264,7 +277,7 @@ type BookingView = {
   depositBdt: number;
   balanceBdt: number;
   depositPercent?: number;
-  vehicle: { name: string; subtitle?: string; seats: number; luggage: number; photos: string[] } | null;
+  vehicle: { name: string; subtitle?: string; category?: string; make?: string; model?: string; seats: number; luggage: number; photos: string[] } | null;
   priceSnapshot?: { depositPercent?: number };
 };
 
@@ -289,38 +302,53 @@ export function ReviewScreen({
   return (
     <Screen>
       <Header title={t('review')} onBack={() => navigation.goBack()} />
-      <ScrollView style={{ flex: 1, backgroundColor: colors.ivory }} contentContainerStyle={{ padding: 16, paddingBottom: 28 }}>
+      <ScrollView style={{ flex: 1, backgroundColor: colors.ivory }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 24 }}>
         <Text style={styles.hint}>{t('reviewHint')}</Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {booking ? (
           <>
-            <FieldRow icon="plane" label={t('pickup')} value={booking.pickupLabel} />
-            <FieldRow icon="calendar" label="Stay" value={`${booking.datesLabel}\n${booking.pickupTime}`} />
-            <View style={styles.pair}>
-              <Mini icon="people" label={t('passengers')} value={String(booking.passengers)} />
-              <Mini icon="bag" label={t('luggage')} value={String(booking.luggage)} />
+            <View style={styles.group}>
+              <ReviewRow icon="plane" label={t('pickup')} value={booking.pickupLabel} />
+              <View style={styles.groupLine} />
+              <ReviewRow icon="calendar" value={booking.datesLabel} note={snap?.days ? `${snap.days} days` : undefined} />
+              <View style={styles.groupLine} />
+              <ReviewRow icon="clock" label={t('pickupTime')} value={booking.pickupTime} />
+              <View style={styles.groupLine} />
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                  <ReviewRow icon="people" label={t('passengers')} value={String(booking.passengers)} />
+                </View>
+                <View style={styles.groupSplit} />
+                <View style={{ flex: 1 }}>
+                  <ReviewRow icon="bag" label={t('luggage')} value={String(booking.luggage)} />
+                </View>
+              </View>
             </View>
             {booking.vehicle ? (
-              <View style={styles.vehicleMini}>
+              <Pressable style={styles.vehicleMini} onPress={() => navigation.goBack()}>
                 <Image source={photoSource(booking.vehicle.photos[0])} style={styles.miniPhoto} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{booking.vehicle.name}</Text>
+                  <Text style={styles.miniTitle}>{booking.vehicle.make ? vehicleTitle(booking.vehicle) : booking.vehicle.name}</Text>
                   <Text style={styles.cardSub}>{booking.vehicle.seats} seats • {booking.vehicle.luggage} luggage</Text>
                 </View>
-                <Text style={styles.chev}>›</Text>
-              </View>
+                <Icon name="chevron" size={18} color={colors.ink} />
+              </Pressable>
             ) : null}
+            <View style={styles.moneyTop} />
             <Money label={`${t('total')}${snap?.days ? ` (${snap.days} days)` : ''}`} value={bdt(booking.totalBdt)} strong />
             <Money label={t('payNow')} value={bdt(booking.depositBdt)} />
-            <Money label={t('balance')} value={bdt(booking.balanceBdt)} />
+            <Money label={t('balance')} value={bdt(booking.balanceBdt)} last />
             <Pressable style={styles.agree} onPress={() => setAgree((value) => !value)}>
-              <View style={[styles.box, agree && styles.boxOn]}>{agree ? <Text style={{ color: colors.white }}>✓</Text> : null}</View>
-              <Text style={styles.agreeText}>{t('agree')}</Text>
+              <View style={[styles.box, agree && styles.boxOn]}>{agree ? <Icon name="tick" size={18} color={colors.white} /> : null}</View>
+              <Text style={styles.agreeText}>
+                I agree to the <Text style={{ color: colors.muted }}>terms and conditions</Text>
+              </Text>
             </Pressable>
             <GoldButton
               label={t('payCta')}
               disabled={!agree}
               onPress={() => navigation.navigate('Payment', { bookingId: booking.id })}
+              height={54}
             />
           </>
         ) : null}
@@ -329,21 +357,26 @@ export function ReviewScreen({
   );
 }
 
-function Mini({ icon, label, value }: { icon: string; label: string; value: string }) {
+function Money({ label, value, strong, last }: { label: string; value: string; strong?: boolean; last?: boolean }) {
   return (
-    <View style={styles.mini}>
-      <Icon name={icon} size={18} color={colors.secondary} />
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <Text style={styles.optionTitle}>{value}</Text>
+    <View style={[styles.money, last && { borderBottomWidth: 0 }]}>
+      <Text style={styles.moneyLabel}>{label}</Text>
+      <Text style={[styles.moneyValue, strong && { fontFamily: fonts.sansBold, fontSize: 21 }]}>{value}</Text>
     </View>
   );
 }
 
-function Money({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function ReviewRow({ icon, label, value, note }: { icon: string; label?: string; value: string; note?: string }) {
   return (
-    <View style={styles.money}>
-      <Text style={[styles.moneyLabel, strong && { fontWeight: '700', color: colors.ink }]}>{label}</Text>
-      <Text style={[styles.moneyValue, strong && { fontWeight: '700' }]}>{value}</Text>
+    <View style={styles.reviewRow}>
+      <View style={styles.reviewIcon}>
+        <Icon name={icon} size={24} color={colors.ink} />
+      </View>
+      <View style={{ flex: 1 }}>
+        {label ? <Text style={styles.reviewLabel}>{label}</Text> : null}
+        <Text style={styles.reviewValue}>{value}</Text>
+        {note ? <Text style={styles.reviewLabel}>{note}</Text> : null}
+      </View>
     </View>
   );
 }
@@ -405,74 +438,181 @@ export function PaymentScreen({
   );
 }
 
+type ConfirmedBooking = BookingView & {
+  status: string;
+  paidBdt: number;
+  dueBdt: number;
+  driver: { name: string; photoUrl?: string | null; languages: string[]; rating: number; reviewCount: number; experienceYears?: number } | null;
+  payments: { id: string; kind: string; status: string; amountBdt: number; displayLabel: string; createdAt: string }[];
+  invoices: { id: string; number: string; amountBdt: number }[];
+};
+
+const statusCopy: Record<string, { title: string; body: string }> = {
+  CONFIRMED: { title: 'Your stay is confirmed', body: 'Your deposit is received and the vehicle is reserved for you.' },
+  PENDING_APPROVAL: { title: 'Request received', body: 'Your deposit is received. OVYK will approve this request shortly and let you know.' },
+  ACTIVE: { title: 'Your stay is under way', body: 'Your driver and vehicle are with you.' },
+  COMPLETED: { title: 'Stay completed', body: 'Thank you for travelling with OVYK.' },
+  CANCELLED: { title: 'Booking cancelled', body: 'This booking was cancelled. Any refund appears in My stay.' },
+};
+
 export function ConfirmationScreen({
   navigation,
   route,
 }: {
-  navigation: { navigate: (name: string) => void };
+  navigation: { navigate: (name: string) => void; popToTop: () => void };
   route: { params: { bookingId: string } };
 }) {
-  const [booking, setBooking] = useState<BookingView & { reference: string; status: string } | null>(null);
+  const [booking, setBooking] = useState<ConfirmedBooking | null>(null);
+  const [error, setError] = useState('');
   useEffect(() => {
-    api<BookingView & { reference: string; status: string }>(`/bookings/${route.params.bookingId}`).then(setBooking).catch(() => undefined);
+    api<ConfirmedBooking>(`/bookings/${route.params.bookingId}`).then(setBooking).catch((err) => setError(err.message));
   }, [route.params.bookingId]);
+
+  const copy = booking ? statusCopy[booking.status] || { title: booking.status.replaceAll('_', ' '), body: '' } : null;
+  const deposit = booking?.payments.find((payment) => payment.kind === 'DEPOSIT' && payment.status === 'SUCCEEDED');
+  const days = (booking?.priceSnapshot as { days?: number } | undefined)?.days;
+
+  function leave(target?: string) {
+    navigation.popToTop();
+    if (target) navigation.navigate(target);
+  }
+
   return (
     <Screen>
       <Header title="Confirmed" />
-      <View style={styles.payBody}>
-        <Text style={styles.detailTitle}>{booking?.reference || 'OVYK'}</Text>
-        <Text style={styles.copy}>Your deposit is received. {booking?.datesLabel}. A dedicated driver will be confirmed before pickup.</Text>
-        <GoldButton label="View my stay" onPress={() => navigation.navigate('Stay')} />
-      </View>
+      <ScrollView style={{ flex: 1, backgroundColor: colors.ivory }} contentContainerStyle={{ padding: 16, paddingBottom: 28 }}>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {booking && copy ? (
+          <>
+            <View style={styles.done}>
+              <View style={[styles.doneMark, booking.status === 'CANCELLED' && { backgroundColor: colors.danger }]}>
+                <Text style={styles.doneTick}>{booking.status === 'CANCELLED' ? '✕' : '✓'}</Text>
+              </View>
+              <Text style={styles.doneTitle}>{copy.title}</Text>
+              {copy.body ? <Text style={[styles.copy, { textAlign: 'center' }]}>{copy.body}</Text> : null}
+              <Text style={styles.refLabel}>Booking reference</Text>
+              <Text style={styles.ref}>{booking.reference}</Text>
+            </View>
+
+            {booking.vehicle ? (
+              <View style={styles.vehicleMini}>
+                <Image source={photoSource(booking.vehicle.photos[0])} style={styles.miniPhoto} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle}>{booking.vehicle.name}</Text>
+                  <Text style={styles.cardSub}>{booking.vehicle.subtitle || `${booking.vehicle.seats} seats • ${booking.vehicle.luggage} luggage`}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <FieldRow icon="calendar" label={days ? `Stay · ${days} days` : 'Stay'} value={booking.datesLabel} />
+            <FieldRow icon="plane" label={`Pickup at ${booking.pickupTime}`} value={booking.pickupLabel} />
+
+            <View style={styles.receipt}>
+              <Text style={styles.receiptTitle}>Your driver</Text>
+              {booking.driver ? (
+                <View style={styles.driverRow}>
+                  <Image source={photoSource(booking.driver.photoUrl)} style={styles.avatar} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.optionTitle}>{booking.driver.name}</Text>
+                    <Text style={styles.cardSub}>
+                      {booking.driver.languages.join(', ')} · {booking.driver.rating.toFixed(1)} ({booking.driver.reviewCount})
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.copy}>A dedicated driver will be confirmed before pickup. We will notify you.</Text>
+              )}
+            </View>
+
+            <View style={styles.receipt}>
+              <Text style={styles.receiptTitle}>Payment receipt</Text>
+              <Money label={`Total${days ? ` (${days} days)` : ''}`} value={bdt(booking.totalBdt)} strong />
+              <Money label={deposit ? `Paid · ${deposit.displayLabel}` : 'Paid'} value={bdt(booking.paidBdt)} />
+              <Money label="Balance due before pickup" value={bdt(booking.dueBdt)} />
+              {booking.invoices[0] ? <Text style={styles.invoice}>Invoice {booking.invoices[0].number}</Text> : null}
+            </View>
+
+            <GoldButton label="View my stay" onPress={() => leave('Stay')} />
+            <Pressable style={styles.homeLink} onPress={() => leave()}>
+              <Text style={styles.homeLinkText}>Back to home</Text>
+            </Pressable>
+          </>
+        ) : !error ? (
+          <Text style={styles.copy}>Loading your booking</Text>
+        ) : null}
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  hint: { fontFamily: sans, color: colors.secondary, marginBottom: 12 },
-  card: { backgroundColor: colors.card, borderRadius: 18, marginBottom: 14, overflow: 'hidden' },
-  cardOn: { borderWidth: 1.5, borderColor: colors.ink },
-  cardImage: { width: '100%', height: 150 },
+  hint: { fontFamily: fonts.sans, fontSize: 14, color: colors.secondary, textAlign: 'center', marginBottom: 14 },
+  card: { backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, marginBottom: 14, overflow: 'hidden' },
+  cardOn: { borderWidth: 1.5, borderColor: colors.champagneDark },
+  cardImage: { width: '100%', height: 188 },
   mark: { position: 'absolute', top: 12, right: 12 },
+  priceCol: { alignItems: 'flex-end', justifyContent: 'flex-end', paddingBottom: 2 },
+  capDivider: { width: 1, height: 22, backgroundColor: colors.border, marginHorizontal: 12 },
   ring: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.white, backgroundColor: 'rgba(255,255,255,0.35)' },
-  cardBody: { flexDirection: 'row', padding: 14, gap: 8 },
-  cardTitle: { fontFamily: serif, fontSize: 20, color: colors.ink },
-  cardSub: { fontFamily: sans, color: colors.secondary, marginTop: 2 },
-  capRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  cap: { fontFamily: sans, color: colors.ink, marginRight: 8 },
-  price: { fontFamily: sans, fontWeight: '700', color: colors.ink },
-  forDays: { fontFamily: sans, color: colors.muted, fontSize: 12 },
+  cardBody: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, gap: 8 },
+  cardTitle: { fontFamily: fonts.serifBold, fontSize: 21, lineHeight: 26, color: colors.ink },
+  cardSub: { fontFamily: fonts.sans, fontSize: 15, color: colors.secondary, marginTop: 1 },
+  capRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  cap: { fontFamily: fonts.sans, fontSize: 15, color: colors.ink },
+  price: { fontFamily: fonts.sansBold, fontSize: 19, color: colors.ink },
+  forDays: { fontFamily: fonts.sans, color: colors.secondary, fontSize: 15, marginTop: 1 },
   warn: { color: colors.danger, fontFamily: sans, fontSize: 12, marginTop: 6 },
   bn: { fontFamily: sans, color: colors.secondary, paddingHorizontal: 14, paddingBottom: 12 },
-  footer: { padding: 16, backgroundColor: colors.ivory },
-  hero: { width: '100%', height: 230 },
-  detailTitle: { fontFamily: serif, fontSize: 28, color: colors.ink },
-  copy: { fontFamily: sans, color: colors.secondary, marginTop: 6, lineHeight: 20 },
-  thumb: { width: 120, height: 84, borderRadius: 12, marginRight: 8 },
-  specs: { flexDirection: 'row', gap: 16, marginVertical: 8 },
-  spec: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  specText: { fontFamily: sans, color: colors.ink },
-  verified: { fontFamily: sans, color: colors.secondary, marginBottom: 8 },
-  line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-  lineTitle: { fontFamily: sans, fontSize: 16, color: colors.ink, fontWeight: '600' },
-  lineSub: { fontFamily: sans, color: colors.muted, marginTop: 2 },
+  footer: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: colors.ivory },
+  hero: { width: '100%', height: 236 },
+  detailTitle: { fontFamily: fonts.serifBold, fontSize: 22, lineHeight: 28, color: colors.ink },
+  copy: { fontFamily: fonts.sans, fontSize: 15, color: colors.secondary, marginTop: 2, lineHeight: 21 },
+  thumbs: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  thumb: { height: 106, borderRadius: 8 },
+  specs: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 12 },
+  specDivider: { width: 1, height: 26, backgroundColor: colors.border },
+  spec: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  specText: { fontFamily: fonts.sans, fontSize: 15, color: colors.ink },
+  line: { flexDirection: 'row', alignItems: 'center', gap: 16, minHeight: 66, paddingHorizontal: 18, paddingVertical: 10, marginBottom: 8, backgroundColor: colors.card, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+  lineTitle: { fontFamily: fonts.sansSemi, fontSize: 17, color: colors.ink },
+  lineSub: { fontFamily: fonts.sans, fontSize: 15, color: colors.secondary, marginTop: 1 },
   chev: { color: colors.muted, fontSize: 22 },
   terms: { backgroundColor: colors.card, borderRadius: 12, padding: 12, marginBottom: 12 },
   term: { fontFamily: sans, color: colors.secondary, marginBottom: 6, lineHeight: 18 },
   error: { color: colors.danger, fontFamily: sans, marginVertical: 8 },
-  pair: { flexDirection: 'row', gap: 10 },
-  mini: { flex: 1, backgroundColor: colors.card, borderRadius: 16, padding: 12 },
   fieldLabel: { fontFamily: sans, color: colors.muted, fontSize: 12, marginTop: 6 },
   optionTitle: { fontFamily: sans, fontSize: 16, color: colors.ink, fontWeight: '600' },
-  vehicleMini: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 10, marginVertical: 8 },
-  miniPhoto: { width: 74, height: 56, borderRadius: 10 },
-  money: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
-  moneyLabel: { fontFamily: sans, color: colors.secondary },
-  moneyValue: { fontFamily: sans, color: colors.ink },
-  agree: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 },
-  box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
-  boxOn: { backgroundColor: colors.ink },
-  agreeText: { fontFamily: sans, color: colors.ink, flex: 1 },
+  vehicleMini: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.card, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 8, paddingRight: 16, marginTop: 10 },
+  miniTitle: { fontFamily: fonts.serifBold, fontSize: 18, color: colors.ink },
+  group: { backgroundColor: colors.card, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8 },
+  groupLine: { height: 1, backgroundColor: colors.border, marginHorizontal: 8 },
+  groupSplit: { width: 1, alignSelf: 'stretch', backgroundColor: colors.border, marginVertical: 10 },
+  reviewRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 10, paddingVertical: 11 },
+  reviewIcon: { width: 28, alignItems: 'center' },
+  reviewLabel: { fontFamily: fonts.sans, fontSize: 14, color: colors.muted },
+  reviewValue: { fontFamily: fonts.sansSemi, fontSize: 16, color: colors.ink },
+  moneyTop: { height: 1, backgroundColor: colors.border, marginTop: 10 },
+  miniPhoto: { width: 116, height: 72, borderRadius: 6 },
+  money: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border },
+  moneyLabel: { fontFamily: fonts.sans, fontSize: 17, color: colors.ink },
+  moneyValue: { fontFamily: fonts.sans, fontSize: 17, color: colors.ink },
+  agree: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14, marginBottom: 20, paddingHorizontal: 4 },
+  box: { width: 26, height: 26, borderRadius: 5, borderWidth: 1.5, borderColor: colors.champagneDark, alignItems: 'center', justifyContent: 'center' },
+  boxOn: { backgroundColor: '#151413' },
+  agreeText: { fontFamily: fonts.sans, fontSize: 14, color: colors.ink, flex: 1 },
   payBody: { flex: 1, backgroundColor: colors.ivory, padding: 16 },
+  done: { alignItems: 'center', paddingVertical: 12, marginBottom: 8 },
+  doneMark: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.champagne, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  doneTick: { color: colors.white, fontSize: 30, fontWeight: '700' },
+  doneTitle: { fontFamily: serif, fontSize: 26, color: colors.ink, textAlign: 'center' },
+  refLabel: { fontFamily: sans, color: colors.muted, fontSize: 12, marginTop: 16, letterSpacing: 0.6, textTransform: 'uppercase' },
+  ref: { fontFamily: serif, fontSize: 24, color: colors.ink, marginTop: 4, letterSpacing: 1 },
+  receipt: { backgroundColor: colors.card, borderRadius: 16, padding: 14, marginBottom: 10 },
+  receiptTitle: { fontFamily: sans, color: colors.muted, fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 },
+  driverRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+  avatar: { width: 48, height: 48, borderRadius: 24 },
+  invoice: { fontFamily: sans, color: colors.muted, fontSize: 12, marginTop: 6, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  homeLink: { alignItems: 'center', paddingVertical: 16 },
+  homeLinkText: { fontFamily: sans, color: colors.ink, fontSize: 16, textDecorationLine: 'underline' },
   payOption: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginVertical: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });

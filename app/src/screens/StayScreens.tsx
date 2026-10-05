@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { api } from '../api';
 import { GhostButton, GoldButton, Header, Screen } from '../components/ui';
-import { bdt } from '../format';
+import { addDays, bdt } from '../format';
 import { photoSource } from '../images';
 import { Lang } from '../i18n';
 import { SessionUser, useApp } from '../state';
@@ -14,6 +14,8 @@ type Stay = {
   status: string;
   paymentStatus: string;
   datesLabel: string;
+  startDate: string;
+  endDate: string;
   pickupLabel: string;
   pickupTime: string;
   totalBdt: number;
@@ -28,12 +30,16 @@ type Stay = {
   shares: { id: string; name: string; status: string; token: string }[];
 };
 
-export function MyStayScreen({ navigation }: { navigation: { navigate: (name: string, params?: object) => void } }) {
+export function MyStayScreen({
+  navigation,
+}: {
+  navigation: { navigate: (name: string, params?: object) => void; addListener: (event: 'focus', callback: () => void) => () => void };
+}) {
   const [rows, setRows] = useState<Stay[]>([]);
   const [error, setError] = useState('');
   const load = () => api<Stay[]>('/bookings').then(setRows).catch((err) => setError(err.message));
-  useEffect(() => { load(); }, []);
-  const current = rows[0];
+  useEffect(() => navigation.addListener('focus', load), [navigation]);
+  const current = rows.find((stay) => stay.status !== 'CANCELLED' && stay.status !== 'COMPLETED') || rows[0];
 
   return (
     <Screen>
@@ -41,8 +47,8 @@ export function MyStayScreen({ navigation }: { navigation: { navigate: (name: st
       <ScrollView style={styles.body} contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {!current ? <Text style={styles.copy}>When you confirm a vehicle, the stay, driver and live tracking appear here.</Text> : null}
-        {current ? <StayCard stay={current} navigation={navigation} onChange={load} /> : null}
-        {rows.slice(1).map((stay) => (
+        {current ? <StayCard key={current.id} stay={current} navigation={navigation} onChange={load} /> : null}
+        {rows.filter((stay) => stay !== current).map((stay) => (
           <Pressable key={stay.id} style={styles.card} onPress={() => navigation.navigate('Tracking', { bookingId: stay.id })}>
             <Text style={styles.ref}>{stay.reference}</Text>
             <Text style={styles.copy}>{stay.datesLabel} · {stay.status}</Text>
@@ -54,7 +60,7 @@ export function MyStayScreen({ navigation }: { navigation: { navigate: (name: st
 }
 
 function StayCard({ stay, navigation, onChange }: { stay: Stay; navigation: { navigate: (name: string, params?: object) => void }; onChange: () => void }) {
-  const [endDate, setEndDate] = useState('2025-11-06');
+  const [endDate, setEndDate] = useState(() => addDays(stay.endDate, 1));
   const [message, setMessage] = useState('');
   const [nominee, setNominee] = useState('Family');
   const [rating, setRating] = useState(5);

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api, setToken } from './api';
+import { addDays, todayIso } from './format';
 import { Lang } from './i18n';
 
 export type SessionUser = {
@@ -30,6 +31,8 @@ export type Draft = {
   pickupKind: string;
   pickupLat?: number;
   pickupLng?: number;
+  cityLat?: number;
+  cityLng?: number;
   flightNumber: string;
   childSeat: boolean;
   accessibility: boolean;
@@ -38,26 +41,32 @@ export type Draft = {
   promoCode: string;
 };
 
-export const defaultDraft: Draft = {
-  citySlug: 'sylhet',
-  cityName: 'Sylhet',
-  type: 'STAY',
-  startDate: '2025-10-21',
-  endDate: '2025-11-04',
-  pickupTime: '14:00',
-  passengers: 4,
-  luggage: 3,
-  pickupLabel: 'Sylhet International Airport',
-  pickupKind: 'AIRPORT',
-  pickupLat: 24.9639,
-  pickupLng: 91.8668,
-  flightNumber: '',
-  childSeat: false,
-  accessibility: false,
-  notes: '',
-  vehicleId: '',
-  promoCode: '',
-};
+export const STAY_NIGHTS = 7;
+
+export function makeDraft(): Draft {
+  const startDate = addDays(todayIso(), 1);
+  return {
+    citySlug: '',
+    cityName: '',
+    type: 'STAY',
+    startDate,
+    endDate: addDays(startDate, STAY_NIGHTS),
+    pickupTime: '14:00',
+    passengers: 1,
+    luggage: 1,
+    pickupLabel: '',
+    pickupKind: '',
+    flightNumber: '',
+    childSeat: false,
+    accessibility: false,
+    notes: '',
+    vehicleId: '',
+    promoCode: '',
+  };
+}
+
+export type City = { slug: string; name: string; lat: number; lng: number };
+export type Place = { id: string; name: string; line: string; kind: string; lat: number; lng: number };
 
 type AppState = {
   ready: boolean;
@@ -77,7 +86,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [language, setLang] = useState<Lang>('EN');
-  const [draft, setDraftState] = useState<Draft>(defaultDraft);
+  const [draft, setDraftState] = useState<Draft>(makeDraft);
 
   useEffect(() => {
     (async () => {
@@ -99,6 +108,33 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  // Fill the city and pickup from the live catalogue once signed in.
+  useEffect(() => {
+    if (!user || draft.citySlug) return;
+    api<City[]>('/cities')
+      .then((cities) => {
+        const city = cities.find((row) => row.slug === 'sylhet') || cities[0];
+        if (city) setDraftState((current) => ({ ...current, citySlug: city.slug, cityName: city.name, cityLat: city.lat, cityLng: city.lng }));
+      })
+      .catch(() => undefined);
+  }, [user, draft.citySlug]);
+
+  useEffect(() => {
+    if (!user || !draft.citySlug || draft.pickupLabel) return;
+    api<Place[]>(`/cities/${draft.citySlug}/places`)
+      .then((places) => {
+        const place = places[0];
+        if (place) {
+          setDraftState((current) =>
+            current.citySlug === draft.citySlug && !current.pickupLabel
+              ? { ...current, pickupLabel: place.name, pickupKind: place.kind, pickupLat: place.lat, pickupLng: place.lng }
+              : current,
+          );
+        }
+      })
+      .catch(() => undefined);
+  }, [user, draft.citySlug, draft.pickupLabel]);
+
   const value = useMemo<AppState>(
     () => ({
       ready,
@@ -119,7 +155,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         setToken(null);
         await AsyncStorage.removeItem('ovyk_token');
         setUser(null);
-        setDraftState(defaultDraft);
+        setDraftState(makeDraft());
       },
       refreshMe: async () => {
         const me = await api<SessionUser>('/auth/me');

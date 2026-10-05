@@ -1,71 +1,60 @@
-import React, { useState } from 'react';
-import { ImageBackground, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Image, StatusBar, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, setToken } from '../api';
 import { GoldButton, GhostButton, Logo } from '../components/ui';
 import { welcomePhoto } from '../images';
 import { useT } from '../components/ui';
-import { SessionUser, useApp } from '../state';
-import { colors, sans, serif } from '../theme';
+import { colors, fonts } from '../theme';
 
 export function WelcomeScreen({ navigation }: { navigation: { navigate: (name: string) => void } }) {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  // Frame the van and driver (left of centre in the landscape photo) in the middle of the screen.
+  const photoWidth = width * 1.6;
+  const photoHeight = (photoWidth * 832) / 1248;
   const t = useT();
-  const { signIn } = useApp();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function enter() {
-    setLoading(true);
-    setError('');
-    try {
-      await api('/auth/otp/request', { method: 'POST', body: JSON.stringify({ phone: '+8801711111111' }) });
-      const session = await api<{ accessToken: string; user: SessionUser }>('/auth/otp/verify', {
-        method: 'POST',
-        body: JSON.stringify({ phone: '+8801711111111', code: '123456', name: 'Ahad' }),
-      });
-      setToken(session.accessToken);
-      await signIn(session.user, session.accessToken);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not reach OVYK');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
-    <ImageBackground source={welcomePhoto} style={styles.fill}>
+    <View style={styles.fill}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.scrim} />
-      <View style={[styles.top, { paddingTop: insets.top + 36 }]}>
-        <Logo />
+      <View style={{ position: 'absolute', width: photoWidth, height: photoHeight, left: width / 2 - photoWidth * 0.47, top: height * 0.56 - photoHeight / 2 }}>
+        <Image source={welcomePhoto} style={{ width: '100%', height: '100%' }} />
+        <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none" viewBox="0 0 100 100">
+          <Defs>
+            <LinearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#0B0B0B" stopOpacity="1" />
+              <Stop offset="0.3" stopColor="#0B0B0B" stopOpacity="0.35" />
+              <Stop offset="0.5" stopColor="#0B0B0B" stopOpacity="0" />
+              <Stop offset="0.72" stopColor="#0B0B0B" stopOpacity="0.1" />
+              <Stop offset="1" stopColor="#0B0B0B" stopOpacity="1" />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100" height="100" fill="url(#shade)" />
+        </Svg>
       </View>
-      <View style={[styles.bottom, { paddingBottom: insets.bottom + 28 }]}>
+      <View style={[styles.top, { paddingTop: insets.top + 56 }]}>
+        <Logo size={52} tagline={16} />
         <Text style={styles.headline}>{t('headline')}</Text>
-        <GoldButton label={t('getStarted')} onPress={enter} loading={loading} />
-        <View style={{ height: 12 }} />
-        <GhostButton label={t('signIn')} onPress={() => navigation.navigate('SignIn')} />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Pressable onPress={() => navigation.navigate('SignIn')}>
-          <Text style={styles.hint}>Local demo signs in as Ahad. Other numbers use Sign in.</Text>
-        </Pressable>
       </View>
-    </ImageBackground>
+      <View style={[styles.bottom, { paddingBottom: insets.bottom + 34 }]}>
+        <GoldButton label={t('getStarted')} onPress={() => navigation.navigate('SignIn')} height={56} radius={14} />
+        <View style={{ height: 14 }} />
+        <GhostButton label={t('signIn')} onPress={() => navigation.navigate('SignIn')} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: colors.black },
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.38)' },
   top: { alignItems: 'center' },
-  bottom: { marginTop: 'auto', paddingHorizontal: 22 },
+  bottom: { marginTop: 'auto', paddingHorizontal: 20 },
   headline: {
     color: colors.white,
-    fontFamily: serif,
-    fontSize: 30,
-    lineHeight: 36,
-    marginBottom: 28,
+    fontFamily: fonts.serif,
+    fontSize: 25,
+    lineHeight: 31,
+    textAlign: 'center',
+    marginTop: 36,
   },
-  error: { color: '#F3C1C1', textAlign: 'center', marginTop: 12, fontFamily: sans },
-  hint: { color: 'rgba(255,255,255,0.72)', textAlign: 'center', marginTop: 14, fontFamily: sans, fontSize: 12 },
 });

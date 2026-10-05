@@ -430,6 +430,8 @@ export class BookingService {
             name: booking.vehicle.name,
             subtitle: booking.vehicle.subtitle,
             category: booking.vehicle.category,
+            make: booking.vehicle.make,
+            model: booking.vehicle.model,
             seats: booking.vehicle.seats,
             luggage: booking.vehicle.luggage,
             photos: booking.vehicle.photos,
@@ -492,7 +494,7 @@ export class BookingService {
   async mine(user: User) {
     const rows = await this.prisma.booking.findMany({
       where: { customerId: user.id, status: { not: 'DRAFT' } },
-      orderBy: { startAt: 'desc' },
+      orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }],
     });
     return Promise.all(rows.map((row) => this.present(row.id, user)));
   }
